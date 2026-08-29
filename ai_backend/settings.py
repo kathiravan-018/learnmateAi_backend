@@ -134,4 +134,5 @@ STATIC_URL = 'static/'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "https://learnmate-ai-assistant.netlify.app/"
 ]
