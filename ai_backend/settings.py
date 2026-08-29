@@ -25,7 +25,11 @@ SECRET_KEY = 'django-insecure-xt$)m3cxfz$h-_ibze+o#xzdv#=lwm&vao+0wg7b-0yc$g59&c
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "learnmateai-backend.onrender.com",
+]
 
 
 # Application definition
