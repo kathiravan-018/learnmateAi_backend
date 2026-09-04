@@ -29,75 +29,70 @@ client = genai.Client(
 # ============================================================
 
 def generate_with_retry(prompt, feature_name="Gemini"):
-    """
-    Send a request to Gemini with automatic retry and
-    model fallback.
 
-    Primary model:
-        gemini-3.5-flash-lite
-
-    Fallback model:
-        gemini-2.5-flash-lite
-    """
-
-    models = [
-        "gemini-3.5-flash-lite",
-        "gemini-2.5-flash-lite",
-    ]
+    model = "gemini-3.5-flash-lite"
 
     last_error = None
 
-    for model in models:
+    for attempt in range(3):
 
-        for attempt in range(3):
+        try:
 
-            try:
+            print(
+                f"🚀 {feature_name}: "
+                f"Using {model} - Attempt {attempt + 1}/3"
+            )
+
+            start_time = time.time()
+
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt
+            )
+
+            elapsed = time.time() - start_time
+
+            print(
+                f"🤖 {feature_name}: "
+                f"Response received in {elapsed:.2f} seconds"
+            )
+
+            return response
+
+        except Exception as e:
+
+            last_error = e
+
+            error_message = str(e)
+
+            print(
+                f"❌ {feature_name} Error "
+                f"(attempt {attempt + 1}): {error_message}"
+            )
+
+            # Do not retry permanent errors such as 404
+            if "404" in error_message or "NOT_FOUND" in error_message:
 
                 print(
-                    f"🚀 {feature_name}: "
-                    f"Using {model} - Attempt {attempt + 1}/3"
+                    "❌ Model is unavailable. "
+                    "Stopping retries."
                 )
 
-                start_time = time.time()
+                break
 
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt
-                )
-
-                elapsed = time.time() - start_time
+            # Retry temporary errors such as 503
+            if attempt < 2:
 
                 print(
-                    f"🤖 {feature_name}: "
-                    f"Response received in {elapsed:.2f} seconds"
+                    "⏳ Temporary Gemini error. "
+                    "Retrying in 2 seconds..."
                 )
 
-                return response
+                time.sleep(2)
 
-            except Exception as e:
-
-                last_error = e
-
-                print(
-                    f"❌ {feature_name} Error "
-                    f"({model}, attempt {attempt + 1}): {e}"
-                )
-
-                # Wait before trying again
-                if attempt < 2:
-                    print("⏳ Retrying in 2 seconds...")
-                    time.sleep(2)
-
-        print(
-            f"⚠️ {model} failed after 3 attempts."
-        )
-
-        print(
-            f"🔄 Trying the next Gemini model..."
-        )
-
-    # All models failed
-    print("❌ All Gemini models failed.")
+    print(
+        f"❌ {feature_name}: All attempts failed."
+    )
 
     raise last_error
 
