@@ -30,72 +30,83 @@ client = genai.Client(
 
 def generate_with_retry(prompt, feature_name="Gemini"):
 
-    model = "gemini-3.5-flash-lite"
+    models = [
+        "gemini-3.5-flash",
+        "gemini-3.6-flash",
+    ]
 
     last_error = None
 
-    for attempt in range(3):
+    for model in models:
 
-        try:
+        for attempt in range(2):
 
-            print(
-                f"🚀 {feature_name}: "
-                f"Using {model} - Attempt {attempt + 1}/3"
-            )
-
-            start_time = time.time()
-
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt
-            )
-
-            elapsed = time.time() - start_time
-
-            print(
-                f"🤖 {feature_name}: "
-                f"Response received in {elapsed:.2f} seconds"
-            )
-
-            return response
-
-        except Exception as e:
-
-            last_error = e
-
-            error_message = str(e)
-
-            print(
-                f"❌ {feature_name} Error "
-                f"(attempt {attempt + 1}): {error_message}"
-            )
-
-            # Do not retry permanent errors such as 404
-            if "404" in error_message or "NOT_FOUND" in error_message:
+            try:
 
                 print(
-                    "❌ Model is unavailable. "
-                    "Stopping retries."
+                    f"🚀 {feature_name}: "
+                    f"Using {model} - Attempt {attempt + 1}/2"
                 )
 
-                break
+                start_time = time.time()
 
-            # Retry temporary errors such as 503
-            if attempt < 2:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
+
+                elapsed = time.time() - start_time
 
                 print(
-                    "⏳ Temporary Gemini error. "
-                    "Retrying in 2 seconds..."
+                    f"🤖 {feature_name}: "
+                    f"{model} responded in {elapsed:.2f} seconds"
                 )
 
-                time.sleep(2)
+                return response
+
+            except Exception as e:
+
+                last_error = e
+                error_message = str(e)
+
+                print(
+                    f"❌ {feature_name}: "
+                    f"{model} failed - {error_message}"
+                )
+
+                # Permanent error
+                if "404" in error_message or "NOT_FOUND" in error_message:
+
+                    print(
+                        f"❌ {model} is unavailable. "
+                        f"Trying next model..."
+                    )
+
+                    break
+
+                # Temporary error
+                if attempt < 1:
+
+                    print(
+                        f"⏳ {model} temporarily unavailable. "
+                        f"Retrying in 2 seconds..."
+                    )
+
+                    time.sleep(2)
+
+                else:
+
+                    print(
+                        f"⚠️ {model} failed twice. "
+                        f"Trying next model..."
+                    )
 
     print(
-        f"❌ {feature_name}: All attempts failed."
+        f"❌ {feature_name}: "
+        f"All available models failed."
     )
 
     raise last_error
-
 
 # ============================================================
 # AI CHAT
