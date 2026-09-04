@@ -13,11 +13,29 @@ def chat(request):
     message = request.data.get("message")
     history = request.data.get("history", [])
 
-    response = generate_ai_response(message,history)
+    if not message:
+        return Response(
+            {"error": "Message is required."},
+            status=400
+        )
 
-    return Response({
-        "response": response
-    })
+    try:
+        response = generate_ai_response(message, history)
+
+        return Response({
+            "response": response
+        })
+
+    except Exception as e:
+        print("❌ Gemini Error:", str(e))
+
+        return Response(
+            {
+                "error": "AI service is temporarily unavailable.",
+                "details": str(e)
+            },
+            status=503
+        )
 
 @api_view(["POST"])
 def notes(request):
