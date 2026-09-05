@@ -59,7 +59,6 @@ def generate_with_retry(
                     contents=prompt,
                     config={
                         "max_output_tokens": max_output_tokens,
-                        "temperature": 0.7,
                     }
                 )
 
@@ -138,14 +137,18 @@ def generate_ai_response(message, history):
 conversation:
 {conversation}
 
-Give a clear and concise answer suitable for voice learning.
-Avoid unnecessary detail unless the user asks for a detailed explanation.
+Answer the student's latest question.
+
+Give a complete explanation suitable for a student.
+For a simple question, keep the answer concise but complete.
+Use examples when they improve understanding.
+Do not unnecessarily repeat the conversation.
 """
 
     response = generate_with_retry(
     prompt,
     feature_name="AI Chat",
-    max_output_tokens=500
+    max_output_tokens=800
 )
 
     print("========== GEMINI RESPONSE ==========")
