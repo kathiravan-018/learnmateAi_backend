@@ -30,8 +30,7 @@ client = genai.Client(
 
 def generate_with_retry(
     prompt,
-    feature_name="Gemini",
-    max_output_tokens=800
+    feature_name="Gemini"
 ):
 
     models = [
@@ -57,9 +56,7 @@ def generate_with_retry(
                 response = client.models.generate_content(
                     model=model,
                     contents=prompt,
-                    config={
-                        "max_output_tokens": max_output_tokens,
-                    }
+                    config={}
                 )
 
                 elapsed = time.time() - start_time
@@ -112,6 +109,8 @@ def generate_with_retry(
     )
 
     raise last_error
+
+
 # ============================================================
 # AI CHAT
 # ============================================================
@@ -143,27 +142,35 @@ Give a complete explanation suitable for a student.
 For a simple question, keep the answer concise but complete.
 Use examples when they improve understanding.
 Do not unnecessarily repeat the conversation.
+Do not stop in the middle of a sentence.
+Make sure the answer ends naturally and completely.
 """
 
     response = generate_with_retry(
-    prompt,
-    feature_name="AI Chat",
-    max_output_tokens=800
-)
+        prompt,
+        feature_name="AI Chat"
+    )
 
     print("========== GEMINI RESPONSE ==========")
     print(response.text)
     print("========== END RESPONSE =============")
 
     try:
+
         print(
             "Finish reason:",
             response.candidates[0].finish_reason
         )
+
     except Exception as e:
-        print("Could not read finish reason:", e)
+
+        print(
+            "Could not read finish reason:",
+            e
+        )
 
     return response.text
+
 
 # ============================================================
 # NOTES GENERATOR
@@ -211,8 +218,7 @@ Use Markdown formatting.
 
     response = generate_with_retry(
         prompt,
-        feature_name="Notes Generator",
-        max_output_tokens=1200
+        feature_name="Notes Generator"
     )
 
     return response.text
@@ -279,10 +285,9 @@ Use this structure:
 """
 
     response = generate_with_retry(
-    prompt,
-    feature_name="Quiz Generator",
-    max_output_tokens=1000
-)
+        prompt,
+        feature_name="Quiz Generator"
+    )
 
     return json.loads(response.text)
 
@@ -312,9 +317,8 @@ Code:
 """
 
     response = generate_with_retry(
-    prompt,
-    feature_name="Code Explanation",
-    max_output_tokens=1000
-)
+        prompt,
+        feature_name="Code Explanation"
+    )
 
     return response.text
