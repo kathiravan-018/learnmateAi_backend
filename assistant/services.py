@@ -143,10 +143,22 @@ Avoid unnecessary detail unless the user asks for a detailed explanation.
 """
 
     response = generate_with_retry(
-        prompt,
-        feature_name="AI Chat",
-        max_output_tokens=500
-    )
+    prompt,
+    feature_name="AI Chat",
+    max_output_tokens=500
+)
+
+    print("========== GEMINI RESPONSE ==========")
+    print(response.text)
+    print("========== END RESPONSE =============")
+
+    try:
+        print(
+            "Finish reason:",
+            response.candidates[0].finish_reason
+        )
+    except Exception as e:
+        print("Could not read finish reason:", e)
 
     return response.text
 
