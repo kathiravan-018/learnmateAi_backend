@@ -28,7 +28,11 @@ client = genai.Client(
 # GEMINI REQUEST HELPER
 # ============================================================
 
-def generate_with_retry(prompt, feature_name="Gemini"):
+def generate_with_retry(
+    prompt,
+    feature_name="Gemini",
+    max_output_tokens=800
+):
 
     models = [
         "gemini-3.5-flash",
@@ -52,7 +56,11 @@ def generate_with_retry(prompt, feature_name="Gemini"):
 
                 response = client.models.generate_content(
                     model=model,
-                    contents=prompt
+                    contents=prompt,
+                    config={
+                        "max_output_tokens": max_output_tokens,
+                        "temperature": 0.7,
+                    }
                 )
 
                 elapsed = time.time() - start_time
@@ -74,7 +82,6 @@ def generate_with_retry(prompt, feature_name="Gemini"):
                     f"{model} failed - {error_message}"
                 )
 
-                # Permanent error
                 if "404" in error_message or "NOT_FOUND" in error_message:
 
                     print(
@@ -84,12 +91,11 @@ def generate_with_retry(prompt, feature_name="Gemini"):
 
                     break
 
-                # Temporary error
                 if attempt < 1:
 
                     print(
-                        f"⏳ {model} temporarily unavailable. "
-                        f"Retrying in 2 seconds..."
+                        "⏳ Temporary failure. "
+                        "Retrying in 2 seconds..."
                     )
 
                     time.sleep(2)
@@ -107,16 +113,17 @@ def generate_with_retry(prompt, feature_name="Gemini"):
     )
 
     raise last_error
-
 # ============================================================
 # AI CHAT
 # ============================================================
 
 def generate_ai_response(message, history):
 
+    recent_history = history[-6:]
+
     conversation = ""
 
-    for item in history:
+    for item in recent_history:
 
         conversation += (
             f"{item['role']}: "
@@ -130,15 +137,18 @@ def generate_ai_response(message, history):
 
 conversation:
 {conversation}
+
+Give a clear and concise answer suitable for voice learning.
+Avoid unnecessary detail unless the user asks for a detailed explanation.
 """
 
     response = generate_with_retry(
         prompt,
-        feature_name="AI Chat"
+        feature_name="AI Chat",
+        max_output_tokens=500
     )
 
     return response.text
-
 
 # ============================================================
 # NOTES GENERATOR
@@ -186,7 +196,8 @@ Use Markdown formatting.
 
     response = generate_with_retry(
         prompt,
-        feature_name="Notes Generator"
+        feature_name="Notes Generator",
+        max_output_tokens=1200
     )
 
     return response.text
@@ -253,9 +264,10 @@ Use this structure:
 """
 
     response = generate_with_retry(
-        prompt,
-        feature_name="Quiz Generator"
-    )
+    prompt,
+    feature_name="Quiz Generator",
+    max_output_tokens=1000
+)
 
     return json.loads(response.text)
 
@@ -285,8 +297,9 @@ Code:
 """
 
     response = generate_with_retry(
-        prompt,
-        feature_name="Code Explanation"
-    )
+    prompt,
+    feature_name="Code Explanation",
+    max_output_tokens=1000
+)
 
     return response.text
