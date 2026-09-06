@@ -3,6 +3,7 @@ import time
 import json
 
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 from .prompts import LEARNMATE_SYSTEM_PROMPT
@@ -30,78 +31,85 @@ client = genai.Client(
 
 def generate_with_retry(
     prompt,
-    feature_name="Gemini"
+    feature_name="Gemini",
+    system_instruction=None,
+    response_mime_type=None,
+    response_schema=None
 ):
 
+    # Fast models
     models = [
-        "gemini-3.5-flash",
-        "gemini-3.6-flash",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
     ]
 
     last_error = None
 
+    # Build Gemini configuration
+    config_args = {}
+
+    if system_instruction:
+        config_args["system_instruction"] = system_instruction
+
+    if response_mime_type:
+        config_args["response_mime_type"] = response_mime_type
+
+    if response_schema:
+        config_args["response_schema"] = response_schema
+
+    config = (
+        types.GenerateContentConfig(**config_args)
+        if config_args
+        else None
+    )
+
+    # ========================================================
+    # TRY MODELS
+    # ========================================================
+
     for model in models:
 
-        for attempt in range(2):
+        try:
 
-            try:
+            print(
+                f"🚀 {feature_name}: "
+                f"Using {model}"
+            )
 
-                print(
-                    f"🚀 {feature_name}: "
-                    f"Using {model} - Attempt {attempt + 1}/2"
-                )
+            start_time = time.time()
 
-                start_time = time.time()
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=config
+            )
 
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config={}
-                )
+            elapsed = time.time() - start_time
 
-                elapsed = time.time() - start_time
+            print(
+                f"🤖 {feature_name}: "
+                f"{model} responded in "
+                f"{elapsed:.2f} seconds"
+            )
 
-                print(
-                    f"🤖 {feature_name}: "
-                    f"{model} responded in {elapsed:.2f} seconds"
-                )
+            return response
 
-                return response
+        except Exception as e:
 
-            except Exception as e:
+            last_error = e
 
-                last_error = e
-                error_message = str(e)
+            print(
+                f"❌ {feature_name}: "
+                f"{model} failed: {str(e)}"
+            )
 
-                print(
-                    f"❌ {feature_name}: "
-                    f"{model} failed - {error_message}"
-                )
+            print(
+                f"⚠️ Trying next model..."
+            )
 
-                if "404" in error_message or "NOT_FOUND" in error_message:
-
-                    print(
-                        f"❌ {model} is unavailable. "
-                        f"Trying next model..."
-                    )
-
-                    break
-
-                if attempt < 1:
-
-                    print(
-                        "⏳ Temporary failure. "
-                        "Retrying in 2 seconds..."
-                    )
-
-                    time.sleep(2)
-
-                else:
-
-                    print(
-                        f"⚠️ {model} failed twice. "
-                        f"Trying next model..."
-                    )
+    # ========================================================
+    # ALL MODELS FAILED
+    # ========================================================
 
     print(
         f"❌ {feature_name}: "
@@ -117,57 +125,43 @@ def generate_with_retry(
 
 def generate_ai_response(message, history):
 
-    recent_history = history[-6:]
+    # Keep only recent conversation
+    recent_history = history[-4:]
 
-    conversation = ""
+    conversation_lines = []
 
     for item in recent_history:
 
-        conversation += (
-            f"{item['role']}: "
-            f"{item['content']}\n"
+        conversation_lines.append(
+            f"{item['role']}: {item['content']}"
         )
 
-    conversation += f"user: {message}\n"
+    conversation_lines.append(
+        f"user: {message}"
+    )
+
+    conversation = "\n".join(
+        conversation_lines
+    )
 
     prompt = f"""
-{LEARNMATE_SYSTEM_PROMPT}
+Conversation:
 
-conversation:
 {conversation}
 
 Answer the student's latest question.
 
-Give a complete explanation suitable for a student.
-For a simple question, keep the answer concise but complete.
-Use examples when they improve understanding.
-Do not unnecessarily repeat the conversation.
-Do not stop in the middle of a sentence.
-Make sure the answer ends naturally and completely.
+Give a clear and complete answer.
+Keep simple questions concise.
+Use an example when useful.
+Do not repeat unnecessary information.
 """
 
     response = generate_with_retry(
         prompt,
-        feature_name="AI Chat"
+        feature_name="AI Chat",
+        system_instruction=LEARNMATE_SYSTEM_PROMPT
     )
-
-    print("========== GEMINI RESPONSE ==========")
-    print(response.text)
-    print("========== END RESPONSE =============")
-
-    try:
-
-        print(
-            "Finish reason:",
-            response.candidates[0].finish_reason
-        )
-
-    except Exception as e:
-
-        print(
-            "Could not read finish reason:",
-            e
-        )
 
     return response.text
 
@@ -178,52 +172,92 @@ Make sure the answer ends naturally and completely.
 
 def generate_notes(topic):
 
-    prompt = f"""
+    system_prompt = """
 You are LearnMate AI, a student learning assistant.
+Create clear and easy-to-understand study notes.
+"""
 
-Generate clear, structured and easy-to-understand
-study notes for the given topic.
+    prompt = f"""
+Create study notes about:
 
-Topic:
 {topic}
 
-Follow this structure:
+Use this structure:
 
-# Topic
+# {topic}
 
 ## Definition
 
-Give a simple definition.
-
 ## Key Concepts
-
-Explain the important concepts clearly.
 
 ## Examples
 
-Give useful examples where appropriate.
-
 ## Important Points
-
-List the important points the student should remember.
 
 ## Summary
 
-Give a short summary.
-
-Keep the explanation suitable for a student.
-
-Use Markdown formatting.
+Keep the explanation clear and reasonably concise.
+Use Markdown.
 """
 
     response = generate_with_retry(
         prompt,
-        feature_name="Notes Generator"
+        feature_name="Notes Generator",
+        system_instruction=system_prompt
     )
 
     return response.text
 
 
+# ============================================================
+# QUIZ SCHEMA
+# ============================================================
+
+QUIZ_SCHEMA = {
+    "type": "object",
+    "properties": {
+
+        "questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+
+                    "question": {
+                        "type": "string"
+                    },
+
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+
+                    "correct_answer": {
+                        "type": "integer"
+                    },
+
+                    "explanation": {
+                        "type": "string"
+                    }
+
+                },
+                "required": [
+                    "question",
+                    "options",
+                    "correct_answer",
+                    "explanation"
+                ]
+            }
+        }
+
+    },
+
+    "required": [
+        "questions"
+    ]
+}
 
 
 # ============================================================
@@ -232,90 +266,99 @@ Use Markdown formatting.
 
 def generate_quiz(topic, previous_questions):
 
-    previous = "\n".join(
-        f"- {question}"
-        for question in previous_questions
-    )
+    # Limit previous questions
+    # so the prompt doesn't become unnecessarily large.
+    previous_questions = previous_questions[-10:]
+
+    if previous_questions:
+
+        previous = "\n".join(
+            f"- {question}"
+            for question in previous_questions
+        )
+
+    else:
+
+        previous = "None"
+
+    system_prompt = """
+You are LearnMate AI, a fast quiz generator for students.
+Return only the requested JSON structure.
+"""
 
     prompt = f"""
-You are LearnMate AI, a quiz generator for students.
+Create exactly 5 multiple-choice questions about:
 
-Topic:
 {topic}
 
-Create exactly 5 multiple-choice questions.
+Requirements:
 
-For each question:
-- Provide 4 options.
-- Provide the correct answer as an index from 0 to 3.
-- Provide a short explanation.
-- Keep the question and explanation concise.
+- Exactly 5 questions.
+- Exactly 4 options per question.
+- correct_answer must be 0, 1, 2, or 3.
+- Include a short explanation.
+- Questions must be different.
+- Do not repeat previous questions.
+- Keep questions and explanations concise.
 
-Do not repeat these previous questions:
+Previous questions:
+
 {previous}
-
-Return ONLY valid JSON.
-Do not use markdown.
-Do not add any text outside the JSON.
-
-Required format:
-
-{{
-  "questions": [
-    {{
-      "question": "Question",
-      "options": [
-        "Option A",
-        "Option B",
-        "Option C",
-        "Option D"
-      ],
-      "correct_answer": 0,
-      "explanation": "Short explanation"
-    }}
-  ]
-}}
 """
 
     response = generate_with_retry(
         prompt,
-        feature_name="Quiz Generator"
+        feature_name="Quiz Generator",
+        system_instruction=system_prompt,
+        response_mime_type="application/json",
+        response_schema=QUIZ_SCHEMA
     )
 
-    print("========== QUIZ GEMINI RESPONSE ==========")
+    print(
+        "========== QUIZ GEMINI RESPONSE =========="
+    )
+
     print(response.text)
-    print("===========================================")
+
+    print(
+        "==========================================="
+    )
 
     return json.loads(response.text)
+
+
 # ============================================================
 # CODE EXPLANATION
 # ============================================================
 
 def generate_code_explanation(code):
 
-    prompt = f"""
-You are LearnMate AI, a programming tutor.
+    system_prompt = """
+You are LearnMate AI, a concise programming tutor.
+Explain code clearly for students.
+"""
 
-Explain this code clearly and concisely for a student.
+    prompt = f"""
+Explain this code:
+
+{code}
 
 Include:
-1. What the code does
+
+1. What it does
 2. Step-by-step explanation
 3. Important concepts
 4. Example input/output if useful
 5. Short summary
 
 Avoid unnecessary detail.
-Keep the explanation focused on the given code.
-Do not repeat the code unnecessarily.
-
-Code:
-{code}
+Do not repeat the entire code.
 """
 
     response = generate_with_retry(
         prompt,
-        feature_name="Code Explanation"
+        feature_name="Code Explanation",
+        system_instruction=system_prompt
     )
 
     return response.text
