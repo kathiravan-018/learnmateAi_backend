@@ -289,6 +289,10 @@ Use this structure:
         feature_name="Quiz Generator"
     )
 
+    print("========== QUIZ GEMINI RESPONSE ==========")
+    print(response.text)
+    print("===========================================")
+
     return json.loads(response.text)
 
 
