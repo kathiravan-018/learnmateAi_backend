@@ -29,94 +29,61 @@ client = genai.Client(
 # GEMINI REQUEST HELPER
 # ============================================================
 
-def generate_with_retry(
-    prompt,
+# ============================================================ 
+# GEMINI REQUEST HELPER 
+# ============================================================ 
+def generate_with_retry( 
+    prompt, 
     feature_name="Gemini",
     system_instruction=None,
     response_mime_type=None,
     response_schema=None
-):
+): 
+    # Ordered by fastest latency to reliable quality fallbacks
+    models = [ 
+        "gemini-3.5-flash-lite", # Primary: Fastest & light response
+        "gemini-3.5-flash",      # Secondary: Fast with higher depth
+        "gemini-3.6-flash",      # Backup: Extra intelligence if needed
+    ] 
 
-    # Fast models
-    models = [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-    ]
+    last_error = None 
 
-    last_error = None
-
-    # Build Gemini configuration
     config_args = {}
-
     if system_instruction:
         config_args["system_instruction"] = system_instruction
-
     if response_mime_type:
         config_args["response_mime_type"] = response_mime_type
-
     if response_schema:
         config_args["response_schema"] = response_schema
+        
+    config = types.GenerateContentConfig(**config_args) if config_args else None
 
-    config = (
-        types.GenerateContentConfig(**config_args)
-        if config_args
-        else None
-    )
+    for model in models: 
+        for attempt in range(1): # Keep at 1 attempt per model for faster fallback
+            try: 
+                print(f"🚀 {feature_name}: Using {model}") 
+                start_time = time.time() 
 
-    # ========================================================
-    # TRY MODELS
-    # ========================================================
+                response = client.models.generate_content( 
+                    model=model, 
+                    contents=prompt, 
+                    config=config 
+                ) 
 
-    for model in models:
+                elapsed = time.time() - start_time 
+                print(f"🤖 {feature_name}: {model} responded in {elapsed:.2f} seconds") 
+                return response 
 
-        try:
+            except Exception as e: 
+                last_error = e 
+                error_message = str(e) 
+                print(f"❌ {feature_name}: {model} failed - {error_message}") 
+                
+                # Instantly drop to the next version if we encounter an error
+                break 
 
-            print(
-                f"🚀 {feature_name}: "
-                f"Using {model}"
-            )
-
-            start_time = time.time()
-
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=config
-            )
-
-            elapsed = time.time() - start_time
-
-            print(
-                f"🤖 {feature_name}: "
-                f"{model} responded in "
-                f"{elapsed:.2f} seconds"
-            )
-
-            return response
-
-        except Exception as e:
-
-            last_error = e
-
-            print(
-                f"❌ {feature_name}: "
-                f"{model} failed: {str(e)}"
-            )
-
-            print(
-                f"⚠️ Trying next model..."
-            )
-
-    # ========================================================
-    # ALL MODELS FAILED
-    # ========================================================
-
-    print(
-        f"❌ {feature_name}: "
-        f"All available models failed."
-    )
-
-    raise last_error
+    print(f"❌ {feature_name}: All available models failed.") 
+    raise last_error 
 
 
 # ============================================================
