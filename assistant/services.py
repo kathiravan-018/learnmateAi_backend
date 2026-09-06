@@ -224,63 +224,56 @@ Use Markdown formatting.
     return response.text
 
 
+
+
 # ============================================================
 # QUIZ GENERATOR
 # ============================================================
 
 def generate_quiz(topic, previous_questions):
 
-    previous = ""
-
-    for question in previous_questions:
-
-        previous += f"- {question}\n"
+    previous = "\n".join(
+        f"- {question}"
+        for question in previous_questions
+    )
 
     prompt = f"""
-You are LearnMate AI, a student quiz generator.
+You are LearnMate AI, a quiz generator for students.
 
-Create a quiz for the following topic:
-
+Topic:
 {topic}
 
-Generate exactly 5 multiple-choice questions.
+Create exactly 5 multiple-choice questions.
 
-Each question must contain:
+For each question:
+- Provide 4 options.
+- Provide the correct answer as an index from 0 to 3.
+- Provide a short explanation.
+- Keep the question and explanation concise.
 
-- question
-- exactly 4 options
-- correct_answer
-- explanation
-
-Previously generated questions:
-
+Do not repeat these previous questions:
 {previous}
 
-Generate a completely new quiz.
-
-Do NOT repeat any of the previous questions.
-
-Change the question wording, concepts,
-examples, and options where possible.
-
 Return ONLY valid JSON.
+Do not use markdown.
+Do not add any text outside the JSON.
 
-Use this structure:
+Required format:
 
 {{
-    "questions": [
-        {{
-            "question": "Question text",
-            "options": [
-                "Option A",
-                "Option B",
-                "Option C",
-                "Option D"
-            ],
-            "correct_answer": 0,
-            "explanation": "Explanation"
-        }}
-    ]
+  "questions": [
+    {{
+      "question": "Question",
+      "options": [
+        "Option A",
+        "Option B",
+        "Option C",
+        "Option D"
+      ],
+      "correct_answer": 0,
+      "explanation": "Short explanation"
+    }}
+  ]
 }}
 """
 
@@ -294,8 +287,6 @@ Use this structure:
     print("===========================================")
 
     return json.loads(response.text)
-
-
 # ============================================================
 # CODE EXPLANATION
 # ============================================================
@@ -303,20 +294,22 @@ Use this structure:
 def generate_code_explanation(code):
 
     prompt = f"""
-You are LearnMate AI, a programming learning assistant.
+You are LearnMate AI, a programming tutor.
 
-Explain the following code in a simple way for a student.
+Explain this code clearly and concisely for a student.
 
-Your explanation should include:
-
+Include:
 1. What the code does
 2. Step-by-step explanation
-3. Important concepts used
-4. Example input and output if applicable
-5. A simple summary
+3. Important concepts
+4. Example input/output if useful
+5. Short summary
+
+Avoid unnecessary detail.
+Keep the explanation focused on the given code.
+Do not repeat the code unnecessarily.
 
 Code:
-
 {code}
 """
 
